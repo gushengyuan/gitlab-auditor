@@ -4,7 +4,7 @@ import (
 	"flag"
 
 	"github.com/go-martini/martini"
-	"github.com/kfei/gitlab-auditor/public/core"
+	"github.com/kfei/gitlab-auditor/core"
 	"github.com/martini-contrib/cors"
 	"github.com/martini-contrib/render"
 	logger "github.com/sirupsen/logrus"
