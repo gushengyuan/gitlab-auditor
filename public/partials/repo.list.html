@@ -5,7 +5,7 @@
         <md-item ng-repeat="repo in repos">
           <md-item-content>
             <div class="md-tile-left" style="margin-right: 10px;">
-              <img ng-src="{{ repo.namespace.avatar.url }}"
+              <img ng-src="{{ repo.namespace.avatar_url }}"
                     style="max-width:48px; max-height:48px;"
                     class="face" alt="{{ repo.name }}">
             </div>
@@ -26,7 +26,7 @@
 <div flex layout-padding>
   <div flex>
     <md-content>
-      <div flex ng-show="!!logid" layout="row" layout-margin layout-padding
+      <div flex ng-show="!!logid" layout="column" layout-margin layout-padding
         class="md-whiteframe-z1" style="height: 80vh; overflow-y: auto; background: #FDFDFD; color: #888888; font-family: monospace">
         <div ng-show="!logs[0]" layout-margin layout-align="center center">No data.</div>
         <table ng-show="!!logs[0]" style="min-width: 100%; text-align: left;">
@@ -41,7 +41,7 @@
               <td>{{ log.timestamp }}</td>
               <td>{{ log.userip }}</td>
               <td>{{ log.action }}</td>
-              <td>{{ log.info }}</td>
+              <td>{{ log.username }}</td>
             </tr>
           </tbody>
         </table>

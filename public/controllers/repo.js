@@ -14,10 +14,10 @@ app
             .then(function(res) {
                 $scope.repos = res.data;
                 for (var i in $scope.repos) {
-                    if ($scope.repos[i]["namespace"]["avatar"]["url"] == null) {
-                        $scope.repos[i]["namespace"]["avatar"]["url"] = "assets/images/gitlab_logo.png";
+                    if ($scope.repos[i]["namespace"]["avatar_url"] == null || $scope.repos[i]["namespace"]["avatar_url"] == "") {
+                        $scope.repos[i]["namespace"]["avatar_url"] = "assets/images/gitlab_logo.png";
                     } else {
-                        $scope.repos[i]["namespace"]["avatar"]["url"] = $scope.gitlab.imageUrl($scope.repos[i]["namespace"]["avatar"]["url"]);
+                        $scope.repos[i]["namespace"]["avatar_url"] = $scope.Config.gitlabUrl + $scope.repos[i]["namespace"]["avatar_url"];
                     }
                 }
             }, function(res) {

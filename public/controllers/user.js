@@ -14,7 +14,7 @@ app
             .then(function(res) {
                 $scope.users = res.data;
                 for (var i in $scope.users) {
-                    if ($scope.users[i]["avatar_url"] == null) {
+                    if ($scope.users[i]["avatar_url"] == null || $scope.users[i]["avatar_url"] == "") {
                         $scope.users[i]["avatar_url"] = "assets/images/no_avatar.png";
                     }
                 }
