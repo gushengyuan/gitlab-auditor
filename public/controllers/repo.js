@@ -33,7 +33,7 @@ app
     $scope.fetchRepoLogs = function(repo) {
         $scope.loading.add("fetch-repo-logs");
         $scope.logs = "";
-        $scope.backend.callapi("GET", "/repo/" + repo.replace("/", "+"))
+        $scope.backend.callapi("GET", "/repo/" + repo.replace(/\//g, "+"))
             .then(function(res) {
                 $scope.logs = res.data.logs;
             }, function(res) {
