@@ -7,11 +7,11 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
 	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/xanzy/go-gitlab"
@@ -34,24 +34,8 @@ var (
 	regexNginxGet  = regexp.MustCompile(`/(.+)\.git/info/refs\?service=(.+)`)
 )
 
-type Log struct {
-	IP        string `json:"userip"`
-	UserName  string `json:"username"`
-	Action    string `json:"action"`
-	Timestamp string `json:"timestamp"`
-	Info      string `json:"info"`
-}
-
-type UserLog struct {
-	Logs []Log `json:"logs"`
-}
-
-type RepoLog struct {
-	Logs []Log `json:"logs"`
-}
-
-var userLogMap = make(map[string]UserLog)
-var repoLogMap = make(map[string]RepoLog)
+var userLogMap = make(map[string]GitLog)
+var repoLogMap = make(map[string]GitLog)
 
 func init() {
 	pwd, _ := os.Getwd()
@@ -153,24 +137,23 @@ func ParseNginxLogs(nginxLogPath string) {
 						continue
 					}
 
+					if _method == "GET" {
+						continue
+					}
+
 					// get the repo and action
-					var repoTokens []string
-					if _method == "POST" {
-						// push
-						repoTokens = regexNginxPost.FindStringSubmatch(_url)
-						if len(repoTokens) <= 0 {
-							continue
-						}
-						_repo = repoTokens[1]
+					repoTokens := regexNginxPost.FindStringSubmatch(_url)
+					if len(repoTokens) <= 0 {
+						continue
+					}
+					_repo = repoTokens[1]
+					if repoTokens[2] == "git-receive-pack" {
 						_action = "Push"
-					} else {
-						// pull/fetch
-						repoTokens = regexNginxGet.FindStringSubmatch(_url)
-						if len(repoTokens) <= 0 {
-							continue
-						}
+					} else if repoTokens[2] == "git-upload-pack" {
 						_action = "Fetch"
-						_repo = repoTokens[1]
+					} else {
+						logger.Warnln("unkonw action", _url)
+						continue
 					}
 
 					if strings.Contains(_username, "@") {
@@ -187,16 +170,6 @@ func ParseNginxLogs(nginxLogPath string) {
 					ulog := Log{IP: _userIP, UserName: _username, Action: _action, Timestamp: _timestamp, Info: _repo}
 					userLog.Logs = append(userLog.Logs, ulog)
 					userLogMap[_username] = userLog
-
-					// set the repo log map
-					repoLog := repoLogMap[_repo]
-					if repoLog.Logs == nil {
-						repoLog.Logs = make([]Log, 0)
-					}
-
-					rlog := Log{IP: _userIP, UserName: _username, Action: _action, Timestamp: _timestamp, Info: _repo}
-					repoLog.Logs = append(repoLog.Logs, rlog)
-					repoLogMap[_repo] = repoLog
 					mu.Unlock()
 				}
 			}
@@ -205,7 +178,7 @@ func ParseNginxLogs(nginxLogPath string) {
 	w.Wait()
 }
 
-func GetGitlabMetadata() {
+func GetGitlabUserMetadata() {
 	git, err := gitlab.NewClient(gitlabToken, gitlab.WithBaseURL(gitlabUrl))
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)
@@ -246,6 +219,20 @@ func GetGitlabMetadata() {
 	}
 	w.Wait()
 
+	sort.Sort(GitlabUsers{gitlabUsers})
+}
+
+func GetGitlabRepoMetadata() {
+	git, err := gitlab.NewClient(gitlabToken, gitlab.WithBaseURL(gitlabUrl))
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
+
+	// control the total goroutines for uploading
+	cpuNum := runtime.NumCPU()
+	w := sync.WaitGroup{}
+	ch := make(chan bool, cpuNum)
+
 	for repo := range repoLogMap {
 		ch <- true
 		w.Add(1)
@@ -274,28 +261,104 @@ func GetGitlabMetadata() {
 		}(repo)
 	}
 	w.Wait()
+
+	sort.Sort(GitlabProjects{Projects: gitlabProjects})
 }
 
-func GetUsers(params martini.Params, r render.Render) {
-	r.JSON(200, gitlabUsers)
+func UserDataFilter() {
+	for userId := range userLogMap {
+		userLog := userLogMap[userId]
+		sort.Sort(userLog)
+
+		repoMap := make(map[string][]Log)
+		for _, item := range userLog.Logs {
+			logs := repoMap[item.Info]
+			if logs == nil {
+				logs = make([]Log, 0)
+			}
+			repoMap[item.Info] = append(logs, item)
+		}
+
+		newLogs := GitLog{}
+		newLogs.Logs = make([]Log, 0)
+		for item := range repoMap {
+			logs := filterMap(repoMap[item])
+			newLogs.Logs = append(newLogs.Logs, logs...)
+		}
+		sort.Sort(newLogs)
+
+		userLogMap[userId] = newLogs
+	}
 }
 
-func GetRepos(params martini.Params, r render.Render) {
-	r.JSON(200, gitlabProjects)
+func RepoDataGenrator() {
+	for userId := range userLogMap {
+		userLog := userLogMap[userId]
+
+		for _, log := range userLog.Logs {
+			_repo := log.Info
+
+			// set the repo log map
+			repoLog := repoLogMap[_repo]
+			if repoLog.Logs == nil {
+				repoLog.Logs = make([]Log, 0)
+			}
+			repoLog.Logs = append(repoLog.Logs, log)
+			repoLogMap[_repo] = repoLog
+		}
+	}
+
+	for repo := range repoLogMap {
+		repoLog := repoLogMap[repo]
+		sort.Sort(repoLog)
+		repoLogMap[repo] = repoLog
+	}
 }
 
-func GetUserLogs(params martini.Params, r render.Render) {
-	userId := params["id"]
+func filterMap(logs []Log) []Log {
+	if len(logs) >= 2 {
+		newLogs := make([]Log, 0)
+		length := len(logs)
+		for i, j := length-1, length-2; j >= 0; i, j = i-1, j-1 {
+			logi := logs[i]
+			logj := logs[j]
+			if logi.Info != logj.Info || logi.Action != logj.Action || logi.UserName != logj.UserName || logi.IP != logj.IP {
+				newLogs = append(newLogs, logi)
+			} else {
+				if logi.Action == "Push" {
+					newLogs = append(newLogs, logi)
+				} else {
+					ti, _ := time.Parse("02/Jan/2006:15:04:05", logi.Timestamp)
+					tj, _ := time.Parse("02/Jan/2006:15:04:05", logj.Timestamp)
+					if tj.Unix()-ti.Unix() > 3600 {
+						newLogs = append(newLogs, logi)
+					}
+				}
+			}
 
-	userLog := userLogMap[userId]
-
-	r.JSON(200, userLog)
+			if j == 0 {
+				newLogs = append(newLogs, logj)
+			}
+		}
+		return newLogs
+	} else {
+		return logs
+	}
 }
 
-func GetRepoLogs(params martini.Params, r render.Render) {
-	var repo = strings.Replace(params["name"], "+", "/", -1)
+func DataInitialize(nginxLogPath string) {
+	logger.Info("stat to parse nginx log")
 
-	repoLog := repoLogMap[repo]
+	ParseNginxLogs(nginxLogPath)
+	logger.Info("parse nginx log done")
 
-	r.JSON(200, repoLog)
+	GetGitlabUserMetadata()
+	logger.Info("get gitlab user metadata done")
+
+	UserDataFilter()
+	RepoDataGenrator()
+	logger.Info("logs filter done")
+
+	GetGitlabRepoMetadata()
+	logger.Info("get gitlab repo metadata done")
 }

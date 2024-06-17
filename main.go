@@ -42,11 +42,7 @@ func main() {
 	case h:
 		flag.PrintDefaults()
 	default:
-		core.ParseNginxLogs(nginxLogPath)
-		logger.Info("parse nginx log done")
-
-		core.GetGitlabMetadata()
-		logger.Info("get gitlab metadata done")
+		core.DataInitialize(nginxLogPath)
 
 		m := martini.Classic()
 
