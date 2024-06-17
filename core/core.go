@@ -2,6 +2,7 @@ package core
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -178,6 +179,115 @@ func ParseNginxLogs(nginxLogPath string) {
 	w.Wait()
 }
 
+func ParseShellLogs(shellLogPath string) {
+	fs, err := os.Stat(shellLogPath)
+	if err != nil {
+		log.Fatal("Can not find the log file of gitlab-shell: " + shellLogPath)
+	}
+
+	var files = make([]string, 0)
+	if fs.IsDir() {
+		entrys, err := os.ReadDir(shellLogPath)
+		if err != nil {
+			log.Fatal("Can not read the directory of gitlab-shell: " + shellLogPath)
+		}
+
+		for _, entry := range entrys {
+			files = append(files, fmt.Sprintf("%s/%s", shellLogPath, entry.Name()))
+		}
+	} else {
+		files = append(files, shellLogPath)
+	}
+
+	// control the total goroutines for uploading
+	cpuNum := runtime.NumCPU()
+	w := sync.WaitGroup{}
+	ch := make(chan bool, cpuNum)
+
+	for _, shellLogfile := range files {
+		ch <- true
+		w.Add(1)
+
+		go func(logFile string) {
+			defer func() {
+				w.Done()
+				<-ch
+			}()
+
+			file, err := os.Open(logFile)
+			if err != nil {
+				log.Fatal("Can not open the log file of gitlab-shell: " + logFile)
+			}
+			defer file.Close()
+
+			// correlation_id based map
+			shellLogs := make(map[string][]map[string]interface{})
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				text := scanner.Text()
+				value := make(map[string]interface{})
+				err := json.Unmarshal([]byte(text), &value)
+				if err != nil {
+					logger.Errorln(err)
+					continue
+				}
+
+				command := value["command"]
+				if command == "" {
+					continue
+				}
+
+				correlation_id := value["correlation_id"]
+				if correlation_id != "" {
+					shellLogs[correlation_id.(string)] = append(shellLogs[correlation_id.(string)], value)
+				} else {
+					logger.Errorln("correlation_id not found")
+				}
+			}
+
+			// parse the shell log
+			for _, v := range shellLogs {
+				for _, value := range v {
+					command := value["command"]
+					if command == "" {
+						continue
+					}
+
+					_action := "Unknown"
+					if command == "git-upload-pack" {
+						_action = "Fetch"
+					} else if command == "git-receive-pack" {
+						_action = "Push"
+					} else {
+						continue
+					}
+					_userIP := value["remote_ip"].(string)
+					_username := value["username"].(string)
+					_timestamp := value["time"].(string) // 2024-06-14T07:05:49Z
+					_repo := value["gl_project_path"].(string)
+
+					// convert to the same time format as nginx log
+					t1, _ := time.Parse("2006-01-02T15:04:05Z", _timestamp)
+					_timestamp = t1.Format("02/Jan/2006:15:04:05")
+
+					mu.Lock()
+					// set the user log map
+					userLog := userLogMap[_username]
+					if userLog.Logs == nil {
+						userLog.Logs = make([]Log, 0)
+					}
+					ulog := Log{IP: _userIP, UserName: _username, Action: _action, Timestamp: _timestamp, Info: _repo}
+					userLog.Logs = append(userLog.Logs, ulog)
+					userLogMap[_username] = userLog
+					mu.Unlock()
+					break
+				}
+			}
+		}(shellLogfile)
+	}
+	w.Wait()
+}
+
 func GetGitlabUserMetadata() {
 	git, err := gitlab.NewClient(gitlabToken, gitlab.WithBaseURL(gitlabUrl))
 	if err != nil {
@@ -346,11 +456,14 @@ func filterMap(logs []Log) []Log {
 	}
 }
 
-func DataInitialize(nginxLogPath string) {
+func DataInitialize(nginxLogPath, shellLogPath string) {
 	logger.Info("stat to parse nginx log")
 
 	ParseNginxLogs(nginxLogPath)
 	logger.Info("parse nginx log done")
+
+	ParseShellLogs(shellLogPath)
+	logger.Info("parse shell log done")
 
 	GetGitlabUserMetadata()
 	logger.Info("get gitlab user metadata done")

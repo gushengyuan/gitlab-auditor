@@ -42,7 +42,7 @@ func main() {
 	case h:
 		flag.PrintDefaults()
 	default:
-		core.DataInitialize(nginxLogPath)
+		core.DataInitialize(nginxLogPath, shellLogPath)
 
 		m := martini.Classic()
 

@@ -96,7 +96,7 @@ func TestDateFormat2(t *testing.T) {
 }
 
 func TestExportUserLogs(t *testing.T) {
-	DataInitialize("../nginx")
+	DataInitialize("../nginx", "../gitlab-shell/gitlab-shell.log")
 
 	f := excelize.NewFile()
 	defer func() {
@@ -141,7 +141,7 @@ func TestExportUserLogs(t *testing.T) {
 }
 
 func TestExportRepoLogs(t *testing.T) {
-	DataInitialize("../nginx")
+	DataInitialize("../nginx", "../gitlab-shell/gitlab-shell.log")
 
 	f := excelize.NewFile()
 	defer func() {
