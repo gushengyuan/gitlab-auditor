@@ -1,0 +1,10 @@
+gitlab-auditor*
+gitlab-shell
+go.sum
+*.tar.gz
+*.log
+__debug_bin*
+nginx
+.vscode
+*.xlsx
+*.xls

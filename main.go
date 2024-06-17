@@ -2,12 +2,12 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"log"
 	"os"
 	"regexp"
 	"strings"
 
-	flag "github.com/docker/docker/pkg/mflag"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/cors"
 	"github.com/martini-contrib/render"
@@ -153,13 +153,13 @@ func GetRepoLogs(params martini.Params, r render.Render) {
 
 func init() {
 	flag.BoolVar(&h,
-		[]string{"h", "#help", "-help"},
+		"#help",
 		false,
 		"display this help message")
 
 	flag.StringVar(
 		&logFile,
-		[]string{"f"},
+		"f",
 		"/var/log/gitlab/gitlab-shell/gitlab-shell.log",
 		"path to gitlab-shell.log")
 
