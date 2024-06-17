@@ -10,7 +10,9 @@ app
 
     $scope.fetchUsers = function() {
         $scope.loading.add("list-users");
-        $scope.gitlab.callapi("GET", "/users?per_page=1000")
+        $scope.loading.add("list-users");
+        //$scope.gitlab.callapi("GET", "/users?per_page=1000")
+        $scope.backend.callapi("GET", "/users/" + $scope.Config.gitlabToken + "/" + window.btoa(unescape(encodeURIComponent($scope.Config.gitlabUrl))))
             .then(function(res) {
                 $scope.users = res.data;
                 for (var i in $scope.users) {

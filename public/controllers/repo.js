@@ -10,7 +10,8 @@ app
 
     $scope.fetchRepos = function() {
         $scope.loading.add("list-repos");
-        $scope.gitlab.callapi("GET", "/projects?per_page=1000")
+        //$scope.gitlab.callapi("GET", "/projects?per_page=1000")
+        $scope.backend.callapi("GET", "/projects/" + $scope.Config.gitlabToken + "/" + window.btoa(unescape(encodeURIComponent($scope.Config.gitlabUrl))))
             .then(function(res) {
                 $scope.repos = res.data;
                 for (var i in $scope.repos) {
