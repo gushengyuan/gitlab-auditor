@@ -7,10 +7,11 @@ app
     function backend() {
         this.host = $location.host();
         this.port = $location.port();
+        this.protocol = $location.protocol();
     }
 
     backend.prototype.makeApiUrl = function(path) {
-        return "http://" + this.host + ":" + this.port + path;
+        return this.protocol + "://" + this.host + ":" + this.port + path;
     };
 
     backend.prototype.callapi = function(method, path) {
