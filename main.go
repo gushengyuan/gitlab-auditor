@@ -7,12 +7,13 @@ import (
 	"github.com/kfei/gitlab-auditor/public/core"
 	"github.com/martini-contrib/cors"
 	"github.com/martini-contrib/render"
+	logger "github.com/sirupsen/logrus"
 )
 
 var (
 	h            bool
-	shellLogFile string
-	nginxLogFile string
+	shellLogPath string
+	nginxLogPath string
 )
 
 func init() {
@@ -22,13 +23,13 @@ func init() {
 		"display this help message")
 
 	flag.StringVar(
-		&shellLogFile,
+		&shellLogPath,
 		"shellLog",
 		"/var/log/gitlab/gitlab-shell/gitlab-shell.log",
 		"path to gitlab-shell.log")
 
 	flag.StringVar(
-		&nginxLogFile,
+		&nginxLogPath,
 		"nginxLog",
 		"/var/log/gitlab/nginx/gitlab-access.log",
 		"path to gitlab-access.log")
@@ -41,7 +42,11 @@ func main() {
 	case h:
 		flag.PrintDefaults()
 	default:
-		core.ParseNginxLogs(nginxLogFile)
+		core.ParseNginxLogs(nginxLogPath)
+		logger.Info("parse nginx log done")
+
+		core.GetGitlabMetadata()
+		logger.Info("get gitlab metadata done")
 
 		m := martini.Classic()
 
@@ -53,12 +58,13 @@ func main() {
 			AllowHeaders: []string{"Origin"},
 		}))
 
-		m.Get("/users/:token/:url", core.GetUsers)
-		m.Get("/projects/:token/:url", core.GetRepos)
+		m.Get("/users", core.GetUsers)
+		m.Get("/projects", core.GetRepos)
 
 		m.Get("/user/:id", core.GetUserLogs)
 		m.Get("/project/:name", core.GetRepoLogs)
 
+		logger.Info("Starting Gitlab Auditor")
 		m.Run()
 	}
 }
