@@ -12,13 +12,13 @@ app
 
     gitlab.prototype.callapi = function(method, path) {
         var deferred = $q.defer();
-        var url = Config.gitlabUrl.replace(/\/*$/, "") + '/api/v3' + path;
+        var url = Config.gitlabUrl.replace(/\/*$/, "") + '/api/v4' + path;
 
         $http({
             url: url,
             method: method,
             headers: {
-                'SUDO': 'root',
+                //'SUDO': 'root',
                 'PRIVATE-TOKEN': Config.gitlabToken
             }
         })
