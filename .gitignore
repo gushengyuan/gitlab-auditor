@@ -1,5 +1,6 @@
 gitlab-auditor*
 gitlab-shell
+.DS_Store
 go.sum
 *.tar.gz
 *.log
