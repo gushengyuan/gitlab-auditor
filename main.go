@@ -3,10 +3,9 @@ package main
 import (
 	"flag"
 
-	"github.com/go-martini/martini"
+	"github.com/gin-contrib/static"
+	"github.com/gin-gonic/gin"
 	"github.com/kfei/gitlab-auditor/core"
-	"github.com/martini-contrib/cors"
-	"github.com/martini-contrib/render"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -44,23 +43,20 @@ func main() {
 	default:
 		core.DataInitialize(nginxLogPath, shellLogPath)
 
-		m := martini.Classic()
+		m := gin.Default()
+		//gin.SetMode(gin.ReleaseMode)
 
-		m.Use(render.Renderer())
+		//m.Static("public", "./public")
+		//https://stackoverflow.com/questions/36357791/gin-router-path-segment-conflicts-with-existing-wildcard
+		m.Use(static.Serve("/", static.LocalFile("./public", false)))
 
-		m.Use(cors.Allow(&cors.Options{
-			AllowOrigins: []string{"*"},
-			AllowMethods: []string{"GET", "POST", "DELETE", "HEAD", "OPTIONS", "PUT", "PATCH"},
-			AllowHeaders: []string{"Origin"},
-		}))
+		m.GET("/users", core.GetUsers)
+		m.GET("/projects", core.GetRepos)
 
-		m.Get("/users", core.GetUsers)
-		m.Get("/projects", core.GetRepos)
-
-		m.Get("/user/:id", core.GetUserLogs)
-		m.Get("/project/:name", core.GetRepoLogs)
+		m.GET("/user/:id", core.GetUserLogs)
+		m.GET("/project/:name", core.GetRepoLogs)
 
 		logger.Info("Starting Gitlab Auditor")
-		m.Run()
+		m.Run(":3000")
 	}
 }

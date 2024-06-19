@@ -1,32 +1,33 @@
 package core
 
 import (
+	"net/http"
 	"strings"
 
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
+	"github.com/gin-gonic/gin"
 )
 
-func GetUsers(params martini.Params, r render.Render) {
-	r.JSON(200, gitlabUsers)
+func GetUsers(c *gin.Context) {
+	c.JSON(http.StatusOK, gitlabUsers)
 }
 
-func GetRepos(params martini.Params, r render.Render) {
-	r.JSON(200, gitlabProjects)
+func GetRepos(c *gin.Context) {
+	c.JSON(http.StatusOK, gitlabProjects)
 }
 
-func GetUserLogs(params martini.Params, r render.Render) {
-	userId := params["id"]
+func GetUserLogs(c *gin.Context) {
+	userId := c.Param("id")
 
 	userLog := userLogMap[userId]
 
-	r.JSON(200, userLog)
+	c.JSON(http.StatusOK, userLog)
 }
 
-func GetRepoLogs(params martini.Params, r render.Render) {
-	var repo = strings.Replace(params["name"], "+", "/", -1)
+func GetRepoLogs(c *gin.Context) {
+	name := c.Param("name")
+	repo := strings.Replace(name, "+", "/", -1)
 
 	repoLog := repoLogMap[repo]
 
-	r.JSON(200, repoLog)
+	c.JSON(http.StatusOK, repoLog)
 }
